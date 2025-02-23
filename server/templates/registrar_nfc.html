@@ -1,0 +1,198 @@
+<!-- templates/registrar_nfc.html -->
+{% extends "base.html" %}
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="bg-white rounded-lg shadow dark:bg-gray-800 p-6">
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white">Registrar NFC</h3>
+            <div class="flex items-center gap-2">
+                <span class="text-sm text-gray-500 dark:text-gray-400">Color:</span>
+                <span class="px-3 py-1 text-sm font-medium rounded-lg" 
+                      style="background-color: {{ session.color.lower() }}20; color: {{ session.color.lower() }}; border: 1px solid {{ session.color.lower() }}40;">
+                    {{ session.color }}
+                </span>
+            </div>
+        </div>
+        
+        <div class="mb-6">
+            <label for="nfc_id" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                ID NFC
+            </label>
+            <input type="text" id="nfc_id" autofocus
+                   class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+        </div>
+        <button id="btnGuardar"
+                class="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
+            Guardar
+        </button>
+
+        <div id="mensajeEstado" class="hidden mt-4 p-4 rounded-lg"></div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow dark:bg-gray-800 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white">Registros de la Sesión</h3>
+            <div class="flex items-center gap-2">
+                <span id="totalRegistros" 
+                      class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
+                    Total: {{ registros|length }}
+                </span>
+                <span id="totalOK" 
+                      class="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded dark:bg-green-900 dark:text-green-300">
+                    OK: {{ registros|selectattr('estado', 'equalto', 'nfc_OK')|list|length }}
+                </span>
+            </div>
+        </div>
+        <div class="relative overflow-x-auto">
+            <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                    <tr>
+                        <th scope="col" class="px-6 py-3">NFC ID</th>
+                        <th scope="col" class="px-6 py-3">Color</th>
+                        <th scope="col" class="px-6 py-3">Estado</th>
+                        <th scope="col" class="px-6 py-3">Origen</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaRegistros">
+                    {% for registro in registros %}
+                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
+                        <td class="px-6 py-4 font-mono">{{ registro.nfc_id }}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs font-medium rounded-lg"
+                                  style="background-color: {{ registro.color.lower() }}20; color: {{ registro.color.lower() }}; border: 1px solid {{ registro.color.lower() }}40;">
+                                {{ registro.color }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full {% if registro.estado == 'nfc_OK' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300{% else %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300{% endif %}">
+                                {{ registro.estado }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full {% if registro.origen == 'web' %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300{% else %}bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300{% endif %}">
+                                {{ registro.origen }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const socket = io();
+        const nfcInput = document.getElementById('nfc_id');
+        const btnGuardar = document.getElementById('btnGuardar');
+        const mensajeEstado = document.getElementById('mensajeEstado');
+        const tablaRegistros = document.getElementById('tablaRegistros');
+        const totalRegistros = document.getElementById('totalRegistros');
+        const totalOK = document.getElementById('totalOK');
+
+        socket.on('connect', () => {
+            console.log('Conectado al servidor WebSocket');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Desconectado del servidor WebSocket');
+        });
+        
+        btnGuardar.addEventListener('click', () => {
+            const nfc_id = nfcInput.value.trim();
+            if (!nfc_id) {
+                console.log('NFC ID vacío');
+                return;
+            }
+            
+            console.log('Enviando datos:', {
+                nfc_id: nfc_id,
+                usuario: '{{ session.usuario }}',
+                color: '{{ session.color }}'
+            });
+
+            socket.emit('registrar_nfc', {
+                nfc_id: nfc_id,
+                usuario: '{{ session.usuario }}',
+                color: '{{ session.color }}'
+            });
+            
+            nfcInput.value = '';
+            nfcInput.focus();
+        });
+
+        nfcInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                btnGuardar.click();
+            }
+        });
+        
+        socket.on('respuesta_registro', data => {
+            console.log('Respuesta recibida:', data);
+            
+            // Mostrar mensaje de estado
+            mensajeEstado.textContent = data.estado === 'nfc_OK' ? 
+                'NFC registrado correctamente' : 'NFC duplicado';
+            mensajeEstado.className = data.estado === 'nfc_OK' ? 
+                'block mt-4 p-4 text-green-800 border border-green-300 rounded-lg bg-green-50 dark:bg-gray-800 dark:text-green-400 dark:border-green-800' :
+                'block mt-4 p-4 text-yellow-800 border border-yellow-300 rounded-lg bg-yellow-50 dark:bg-gray-800 dark:text-yellow-400 dark:border-yellow-800';
+            
+            // Actualizar tabla
+            tablaRegistros.innerHTML = data.registros.map(reg => `
+                <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
+                    <td class="px-6 py-4 font-mono">${reg.nfc_id}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded-lg"
+                              style="background-color: ${reg.color.toLowerCase()}20; color: ${reg.color.toLowerCase()}; border: 1px solid ${reg.color.toLowerCase()}40;">
+                            ${reg.color}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full ${
+                            reg.estado === 'nfc_OK' ?
+                            'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
+                            'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+                        }">
+                            ${reg.estado}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full ${
+                            reg.origen === 'web' ?
+                            'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' :
+                            'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'
+                        }">
+                            ${reg.origen}
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+            
+            // Actualizar contadores
+            totalRegistros.textContent = `Total: ${data.total_registros}`;
+            const okCount = data.registros.filter(r => r.estado === 'nfc_OK').length;
+            totalOK.textContent = `OK: ${okCount}`;
+            
+            // Ocultar mensaje después de 3 segundos
+            setTimeout(() => {
+                mensajeEstado.classList.add('hidden');
+            }, 3000);
+        });
+
+        socket.on('error_registro', data => {
+            console.error('Error en registro:', data);
+            mensajeEstado.textContent = 'Error al registrar NFC';
+            mensajeEstado.className = 'block mt-4 p-4 text-red-800 border border-red-300 rounded-lg bg-red-50 dark:bg-gray-800 dark:text-red-400 dark:border-red-800';
+            mensajeEstado.classList.remove('hidden');
+        });
+        
+        // Mantener el foco en el input
+        nfcInput.addEventListener('blur', () => {
+            setTimeout(() => nfcInput.focus(), 10);
+        });
+    });
+</script>
+{% endblock %}

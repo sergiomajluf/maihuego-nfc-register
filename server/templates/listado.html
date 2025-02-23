@@ -1,0 +1,83 @@
+<!-- templates/listado.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="bg-white rounded-lg shadow dark:bg-gray-800 p-6">
+    <div class="flex justify-between items-center mb-4">
+        <div class="flex items-center gap-4">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white">Listado de Usuarios</h2>
+            <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
+                Total Usuarios: {{ resumen|length }}
+            </span>
+        </div>
+        <a href="{{ url_for('descargar_csv') }}" 
+           class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 focus:ring-4 focus:ring-green-300 dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+            Descargar CSV
+        </a>
+    </div>
+    
+    <div class="relative overflow-x-auto shadow-md sm:rounded-lg">
+        <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+            <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                <tr>
+                    <th scope="col" class="px-6 py-3">Usuario</th>
+                    <th scope="col" class="px-6 py-3">Total Registros</th>
+                    <th scope="col" class="px-6 py-3">Registros OK</th>
+                    <th scope="col" class="px-6 py-3">Registros Duplicados</th>
+                    <th scope="col" class="px-6 py-3">Web</th>
+                    <th scope="col" class="px-6 py-3">ESP32</th>
+                    <th scope="col" class="px-6 py-3">Tasa de Éxito</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in resumen %}
+                <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                    <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                        {{ user.usuario }}
+                    </td>
+                    <td class="px-6 py-4">
+                        {{ user.total }}
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+                            {{ user.ok }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
+                            {{ user.duplicados }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                            {{ user.web }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+                            {{ user.esp32 }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if user.total > 0 %}
+                            {% set tasa = (user.ok / user.total * 100)|round(1) %}
+                            <span class="px-2 py-1 text-xs font-medium rounded-full 
+                                       {% if tasa >= 90 %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300
+                                       {% elif tasa >= 70 %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300
+                                       {% else %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300{% endif %}">
+                                {{ tasa }}%
+                            </span>
+                        {% else %}
+                            <span class="text-gray-400">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
