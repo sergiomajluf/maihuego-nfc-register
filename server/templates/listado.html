@@ -25,54 +25,36 @@
                 <tr>
                     <th scope="col" class="px-6 py-3">Usuario</th>
                     <th scope="col" class="px-6 py-3">Total Registros</th>
-                    <th scope="col" class="px-6 py-3">Registros OK</th>
-                    <th scope="col" class="px-6 py-3">Registros Duplicados</th>
-                    <th scope="col" class="px-6 py-3">Web</th>
-                    <th scope="col" class="px-6 py-3">ESP32</th>
-                    <th scope="col" class="px-6 py-3">Tasa de Éxito</th>
+                    {% for color in colores %}
+                    <th scope="col" class="px-6 py-3">{{ color }}</th>
+                    {% endfor %}
+                    <th scope="col" class="px-6 py-3">Duplicados</th>
                 </tr>
             </thead>
             <tbody>
                 {% for user in resumen %}
-                <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+                    data-usuario="{{ user.usuario }}">
                     <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
                         {{ user.usuario }}
                     </td>
                     <td class="px-6 py-4">
-                        {{ user.total }}
-                    </td>
-                    <td class="px-6 py-4">
-                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
-                            {{ user.ok }}
+                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                            {{ user.total }}
                         </span>
                     </td>
+                    {% for color in colores %}
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full"
+                              style="background-color: {{ color.lower() }}20; color: {{ color.lower() }}; border: 1px solid {{ color.lower() }}40;">
+                            {{ user[color.lower()] }}
+                        </span>
+                    </td>
+                    {% endfor %}
                     <td class="px-6 py-4">
                         <span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
                             {{ user.duplicados }}
                         </span>
-                    </td>
-                    <td class="px-6 py-4">
-                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-                            {{ user.web }}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4">
-                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
-                            {{ user.esp32 }}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4">
-                        {% if user.total > 0 %}
-                            {% set tasa = (user.ok / user.total * 100)|round(1) %}
-                            <span class="px-2 py-1 text-xs font-medium rounded-full 
-                                       {% if tasa >= 90 %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300
-                                       {% elif tasa >= 70 %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300
-                                       {% else %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300{% endif %}">
-                                {{ tasa }}%
-                            </span>
-                        {% else %}
-                            <span class="text-gray-400">-</span>
-                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -80,4 +62,79 @@
         </table>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const socket = io();
+        const tbody = document.querySelector('tbody');
+        const totalUsuarios = document.querySelector('span.bg-blue-100');
+        
+        console.log('Socket inicializado en listado usuarios');
+        
+        socket.on('connect', () => {
+            console.log('Conectado al servidor WebSocket');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Desconectado del servidor WebSocket');
+        });
+
+        function updateUserRow(usuario) {
+            fetch(`/api/user_stats/${usuario}`)
+                .then(response => response.json())
+                .then(stats => {
+                    let row = document.querySelector(`tr[data-usuario="${usuario}"]`);
+
+                    if (!row) {
+                        row = document.createElement('tr');
+                        row.className = 'bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600';
+                        row.setAttribute('data-usuario', usuario);
+                        tbody.insertBefore(row, tbody.firstChild);
+
+                        const currentTotal = parseInt(totalUsuarios.textContent.split(': ')[1]);
+                        totalUsuarios.textContent = `Total Usuarios: ${currentTotal + 1}`;
+                    }
+
+                    row.innerHTML = `
+                        <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                            ${stats.usuario}
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                                ${stats.total}
+                            </span>
+                        </td>
+                        ${Array.from(document.querySelectorAll('thead th')).slice(2, -1).map(th => `
+                            <td class="px-6 py-4">
+                                <span class="px-2 py-1 text-xs font-medium rounded-full"
+                                      style="background-color: ${th.textContent.toLowerCase()}20; color: ${th.textContent.toLowerCase()}; border: 1px solid ${th.textContent.toLowerCase()}40;">
+                                    ${stats[th.textContent.toLowerCase()]}
+                                </span>
+                            </td>
+                        `).join('')}
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
+                                ${stats.duplicados}
+                            </span>
+                        </td>
+                    `;
+
+                    row.style.backgroundColor = '#f0f9ff';
+                    setTimeout(() => {
+                        row.style.transition = 'background-color 1s ease';
+                        row.style.backgroundColor = '';
+                    }, 100);
+                });
+        }
+        
+        socket.on('database_updated', function(data) {
+            console.log('Recibido evento database_updated:', data);
+            if (data.type === 'new_registro') {
+                updateUserRow(data.data.usuario);
+            }
+        });
+    });
+</script>
 {% endblock %}

@@ -5,8 +5,8 @@
     <div class="flex justify-between items-center mb-4">
         <div class="flex items-center gap-4">
             <h2 class="text-xl font-bold text-gray-900 dark:text-white">Todos los Registros</h2>
-            <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
-                Total: {{ registros|length }}
+            <span id="totalRegistros" class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
+                Total Registros: {{ registros|length }}
             </span>
         </div>
         <a href="{{ url_for('descargar_csv') }}" 
@@ -27,6 +27,7 @@
                     <th scope="col" class="px-6 py-3">NFC ID</th>
                     <th scope="col" class="px-6 py-3">Color</th>
                     <th scope="col" class="px-6 py-3">Estado</th>
+                    <th scope="col" class="px-6 py-3">Origen</th>
                 </tr>
             </thead>
             <tbody>
@@ -48,36 +49,91 @@
                             {{ registro.estado }}
                         </span>
                     </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full {% if registro.origen == 'web' %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300{% elif registro.origen == '--' %}bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300{% else %}bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300{% endif %}">
+                            {{ registro.origen }}
+                        </span>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-
-    <!-- Paginación -->
-    <div class="flex items-center justify-between mt-4">
-        <div class="flex items-center gap-2">
-            <span class="text-sm text-gray-700 dark:text-gray-400">
-                Mostrando 
-                <span class="font-medium">1</span>
-                a 
-                <span class="font-medium">{{ registros|length }}</span>
-                de 
-                <span class="font-medium">{{ registros|length }}</span>
-                registros
-            </span>
-        </div>
-        
-        <div class="flex items-center justify-between gap-2">
-            <button disabled
-                    class="px-3 py-1 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white opacity-50 cursor-not-allowed">
-                Anterior
-            </button>
-            <button disabled
-                    class="px-3 py-1 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white opacity-50 cursor-not-allowed">
-                Siguiente
-            </button>
-        </div>
-    </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const socket = io();
+        const tbody = document.querySelector('tbody');
+        const totalRegistros = document.getElementById('totalRegistros');
+
+        console.log('Socket inicializado en verTodo');
+        
+        socket.on('connect', () => {
+            console.log('Conectado al servidor WebSocket');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Desconectado del servidor WebSocket');
+        });
+        
+        socket.on('database_updated', function(data) {
+            console.log('Recibido evento database_updated:', data);
+            
+            if (data.type === 'new_registro') {
+                // Crear nueva fila
+                const newRow = document.createElement('tr');
+                newRow.className = 'bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600';
+                
+                newRow.innerHTML = `
+                    <td class="px-6 py-4 font-medium">${data.data.timestamp}</td>
+                    <td class="px-6 py-4">${data.data.usuario}</td>
+                    <td class="px-6 py-4 font-mono">${data.data.nfc_id}</td>
+                    <td class="px-6 py-4">
+                        <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset" 
+                              style="background-color: ${data.data.color.toLowerCase()}20; color: ${data.data.color.toLowerCase()}; ring-color: ${data.data.color.toLowerCase()}30;">
+                            ${data.data.color}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full ${
+                            data.data.estado === 'nfc_OK' ?
+                            'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
+                            'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+                        }">
+                            ${data.data.estado}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full ${
+                            data.data.origen === 'web' ?
+                            'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' :
+                            data.data.origen === '--' ?
+                            'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300' :
+                            'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'
+                        }">
+                            ${data.data.origen}
+                        </span>
+                    </td>
+                `;
+                
+                // Insertar al inicio de la tabla
+                tbody.insertBefore(newRow, tbody.firstChild);
+                
+                // Actualizar contador
+                const currentTotal = parseInt(totalRegistros.textContent.split(': ')[1]);
+                totalRegistros.textContent = `Total Registros: ${currentTotal + 1}`;
+
+                // Efecto visual para la nueva fila
+                newRow.style.backgroundColor = '#f0f9ff';
+                setTimeout(() => {
+                    newRow.style.transition = 'background-color 1s ease';
+                    newRow.style.backgroundColor = '';
+                }, 100);
+            }
+        });
+    });
+</script>
 {% endblock %}
