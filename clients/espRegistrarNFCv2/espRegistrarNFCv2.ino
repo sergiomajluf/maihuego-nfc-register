@@ -6,20 +6,25 @@
 #include <Adafruit_PN532.h>
 
 // Configuración de WiFi (hardcoded)
-const char* ssid = "__";
-const char* password = "majlufgarcia";
+const char* ssid = "bbrands";
+const char* password = "maihue2023.";
 
 // Configuración del servidor
-const char* serverUrl = "http://192.168.1.95:5000/api/registrar_nfc";
+//const char* serverUrl = "http://10.0.1.226:5000/api/registrar_nfc";
+const char* serverUrl = "http://10.0.1.127:5000/api/registrar_nfc";
 
 // Configuración del usuario
-const char* USUARIO = "Patricio Donald";
-const char* COLOR = "Azul";
+const char* USUARIO = "Sergio Majluf";
+const char* COLOR = "Blanco";
 const char* ORIGEN = "esp32";
+
+int lote = 1;
+int succesCount = 0;
+int botellasPorLote = 4; //48
 
 // Configuración de pines
 #define LED_VERDE 25   // GPIO para LED verde
-#define LED_ROJO 26    // GPIO para LED rojo
+#define LED_ROJO 19    // GPIO para LED rojo
 #define BUZZER_PIN 27  // GPIO para Buzzer activo
 
 // Configuración NFC por I2C
@@ -88,18 +93,27 @@ void enviarNFCId(String nfcId) {
     doc["usuario"] = USUARIO;
     doc["color"] = COLOR;
     doc["origen"] = ORIGEN;
+    doc["lote"] = lote;
 
     String requestBody;
     serializeJson(doc, requestBody);
 
-    Serial.print("Lectura enviada con id: ");
-    Serial.println(nfcId);
+    // Mostrar el JSON completo que se enviará
+    Serial.println("---------------------------------------");
+    Serial.println("Enviando JSON al servidor:");
+    Serial.println(requestBody);
+    Serial.println("---------------------------------------");
 
     // Enviar POST
     int httpResponseCode = http.POST(requestBody);
 
     if (httpResponseCode == 200) {
       String response = http.getString();
+
+      // Mostrar la respuesta completa del servidor
+      Serial.println("Respuesta del servidor:");
+      Serial.println(response);
+      Serial.println("---------------------------------------");
 
       // Intentar parsear la respuesta JSON
       StaticJsonDocument<200> responseDoc;
@@ -110,7 +124,20 @@ void enviarNFCId(String nfcId) {
         const char* estado = responseDoc["estado"];
 
         if (strcmp(estado, "nfc_OK") == 0) {
-          Serial.println("Respuesta: Registro OK");
+          succesCount++;
+          Serial.print("Botella registrada. Lote: ");
+          Serial.print(lote);
+          Serial.print(", Botella: ");
+          Serial.print(succesCount);
+          Serial.print("/");
+          Serial.println(botellasPorLote);
+          
+          if (succesCount >= botellasPorLote) {
+            lote++;
+            succesCount = 0;
+            Serial.println("¡LOTE COMPLETADO! Avanzando al siguiente lote.");
+          }
+          
           indicarEstadoOK();  // Solo LED verde por tiempo base
         } else {
           Serial.println("Respuesta: Registro Duplicado");
@@ -121,7 +148,8 @@ void enviarNFCId(String nfcId) {
         indicarEstadoError();
       }
     } else {
-      Serial.println("Respuesta: Error de conexión");
+      Serial.print("Error en HTTP Request: ");
+      Serial.println(httpResponseCode);
       indicarEstadoError();
     }
 
@@ -147,7 +175,7 @@ void leerTarjeta() {
   // Espera por tarjetas tipo ISO14443A (Mifare, etc.)
   success = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 100);
 
-  if (success) {
+  if (success) {    
     String result = "";
     for (int szPos = 0; szPos < uidLength; szPos++) {
       if (uid[szPos] <= 0xF) {
@@ -236,6 +264,10 @@ void setup() {
   digitalWrite(LED_VERDE, LOW);
 
   Serial.println("Iniciándose, hardware OK");
+  Serial.print("Lote actual: ");
+  Serial.println(lote);
+  Serial.print("Botellas por lote: ");
+  Serial.println(botellasPorLote);
 }
 
 void loop() {

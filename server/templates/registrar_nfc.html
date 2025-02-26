@@ -14,12 +14,21 @@
             </div>
         </div>
         
-        <div class="mb-6">
-            <label for="nfc_id" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                ID NFC
-            </label>
-            <input type="text" id="nfc_id" autofocus
-                   class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+                <label for="nfc_id" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                    ID NFC
+                </label>
+                <input type="text" id="nfc_id" autofocus
+                       class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+            </div>
+            <div>
+                <label for="lote" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                    Lote
+                </label>
+                <input type="number" id="lote" min="1"
+                       class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+            </div>
         </div>
         <button id="btnGuardar"
                 class="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
@@ -48,6 +57,7 @@
                 <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                     <tr>
                         <th scope="col" class="px-6 py-3">NFC ID</th>
+                        <th scope="col" class="px-6 py-3">Lote</th>
                         <th scope="col" class="px-6 py-3">Color</th>
                         <th scope="col" class="px-6 py-3">Estado</th>
                         <th scope="col" class="px-6 py-3">Origen</th>
@@ -57,6 +67,7 @@
                     {% for registro in registros %}
                     <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
                         <td class="px-6 py-4 font-mono">{{ registro.nfc_id }}</td>
+                        <td class="px-6 py-4">{{ registro.lote if registro.lote is not none else "-" }}</td>
                         <td class="px-6 py-4">
                             <span class="px-2 py-1 text-xs font-medium rounded-lg"
                                   style="background-color: {{ registro.color.lower() }}20; color: {{ registro.color.lower() }}; border: 1px solid {{ registro.color.lower() }}40;">
@@ -103,6 +114,8 @@
         
         btnGuardar.addEventListener('click', () => {
             const nfc_id = nfcInput.value.trim();
+            const lote = document.getElementById('lote').value.trim();
+            
             if (!nfc_id) {
                 console.log('NFC ID vacío');
                 return;
@@ -111,13 +124,15 @@
             console.log('Enviando datos:', {
                 nfc_id: nfc_id,
                 usuario: '{{ session.usuario }}',
-                color: '{{ session.color }}'
+                color: '{{ session.color }}',
+                lote: lote ? parseInt(lote) : null
             });
 
             socket.emit('registrar_nfc', {
                 nfc_id: nfc_id,
                 usuario: '{{ session.usuario }}',
-                color: '{{ session.color }}'
+                color: '{{ session.color }}',
+                lote: lote ? parseInt(lote) : null
             });
             
             nfcInput.value = '';
@@ -144,6 +159,7 @@
             tablaRegistros.innerHTML = data.registros.map(reg => `
                 <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
                     <td class="px-6 py-4 font-mono">${reg.nfc_id}</td>
+                    <td class="px-6 py-4">${reg.lote !== null ? reg.lote : '-'}</td>
                     <td class="px-6 py-4">
                         <span class="px-2 py-1 text-xs font-medium rounded-lg"
                               style="background-color: ${reg.color.toLowerCase()}20; color: ${reg.color.toLowerCase()}; border: 1px solid ${reg.color.toLowerCase()}40;">

@@ -25,6 +25,7 @@
                     <th scope="col" class="px-6 py-3">Timestamp</th>
                     <th scope="col" class="px-6 py-3">Usuario</th>
                     <th scope="col" class="px-6 py-3">NFC ID</th>
+                    <th scope="col" class="px-6 py-3">Lote</th>
                     <th scope="col" class="px-6 py-3">Color</th>
                     <th scope="col" class="px-6 py-3">Estado</th>
                     <th scope="col" class="px-6 py-3">Origen</th>
@@ -38,6 +39,7 @@
                     </td>
                     <td class="px-6 py-4">{{ registro.usuario }}</td>
                     <td class="px-6 py-4 font-mono">{{ registro.nfc_id }}</td>
+                    <td class="px-6 py-4">{{ registro.lote if registro.lote is not none else "-" }}</td>
                     <td class="px-6 py-4">
                         <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset" 
                               style="background-color: {{ registro.color.lower() }}20; color: {{ registro.color.lower() }}; ring-color: {{ registro.color.lower() }}30;">
@@ -91,6 +93,7 @@
                     <td class="px-6 py-4 font-medium">${data.data.timestamp}</td>
                     <td class="px-6 py-4">${data.data.usuario}</td>
                     <td class="px-6 py-4 font-mono">${data.data.nfc_id}</td>
+                    <td class="px-6 py-4">${data.data.lote !== null ? data.data.lote : '-'}</td>
                     <td class="px-6 py-4">
                         <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset" 
                               style="background-color: ${data.data.color.toLowerCase()}20; color: ${data.data.color.toLowerCase()}; ring-color: ${data.data.color.toLowerCase()}30;">

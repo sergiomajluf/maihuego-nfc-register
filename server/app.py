@@ -22,6 +22,7 @@ class Registro(db.Model):
     color = db.Column(db.String(50), nullable=False)
     estado = db.Column(db.String(20), nullable=False)
     origen = db.Column(db.String(20), nullable=False, default='web')
+    lote = db.Column(db.Integer, nullable=True)
 
 # Crear tablas
 with app.app_context():
@@ -32,9 +33,7 @@ COLORES_BOTELLAS = [
     'Rojo',
     'Verde',
     'Azul',
-    'Amarillo',
-    'Blanco',
-    'Negro'
+    'Amarillo'
 ]
 
 @app.route('/')
@@ -93,6 +92,7 @@ def handle_nfc_registro(data):
         nfc_id = data.get('nfc_id')
         usuario = data.get('usuario')
         color = data.get('color')
+        lote = data.get('lote')  # Nueva variable lote
 
         if not all([nfc_id, usuario, color]):
             raise ValueError("Faltan datos requeridos")
@@ -105,7 +105,8 @@ def handle_nfc_registro(data):
             nfc_id=nfc_id,
             color=color,
             estado='nfc_duplicado' if existe else 'nfc_OK',
-            origen='web'
+            origen='web',
+            lote=lote  # Guardamos el lote
         )
         
         db.session.add(nuevo_registro)
@@ -120,6 +121,7 @@ def handle_nfc_registro(data):
             'estado': r.estado,
             'color': r.color,
             'origen': r.origen,
+            'lote': r.lote,  # Incluimos el lote
             'timestamp': r.timestamp.strftime('%Y-%m-%d %H:%M:%S')
         } for r in registros_sesion]
         
@@ -140,6 +142,7 @@ def handle_nfc_registro(data):
                 'color': nuevo_registro.color,
                 'estado': nuevo_registro.estado,
                 'origen': nuevo_registro.origen,
+                'lote': nuevo_registro.lote,  # Incluimos el lote
                 'timestamp': nuevo_registro.timestamp.strftime('%Y-%m-%d %H:%M:%S')
             }
         })  # True para broadcast
@@ -163,6 +166,7 @@ def api_registrar_nfc():
         usuario = data['usuario']
         color = data['color']
         origen = data.get('origen', '--')
+        lote = data.get('lote')  # Nueva variable lote
 
         # Verificar si el NFC ya existe
         existe = Registro.query.filter_by(nfc_id=nfc_id).first()
@@ -172,7 +176,8 @@ def api_registrar_nfc():
             nfc_id=nfc_id,
             color=color,
             estado='nfc_duplicado' if existe else 'nfc_OK',
-            origen=origen
+            origen=origen,
+            lote=lote  # Guardamos el lote
         )
         
         db.session.add(nuevo_registro)
@@ -187,6 +192,7 @@ def api_registrar_nfc():
                 'color': nuevo_registro.color,
                 'estado': nuevo_registro.estado,
                 'origen': nuevo_registro.origen,
+                'lote': nuevo_registro.lote,  # Incluimos el lote
                 'timestamp': nuevo_registro.timestamp.strftime('%Y-%m-%d %H:%M:%S')
             }
         })
@@ -217,10 +223,19 @@ def ver_listado():
         for color in COLORES_BOTELLAS:
             conteo_colores[color.lower()] = len([r for r in registros if r.color == color])
         
+        # Información de lotes
+        lotes = set([r.lote for r in registros if r.lote is not None])
+        lotes_count = len(lotes)
+        min_lote = min(lotes) if lotes else None
+        max_lote = max(lotes) if lotes else None
+        
         resumen.append({
             'usuario': user[0],
             'total': total,
             'duplicados': duplicados,
+            'lotes_count': lotes_count,
+            'min_lote': min_lote,
+            'max_lote': max_lote,
             **conteo_colores  # Agrega todos los conteos de colores al diccionario
         })
     
@@ -242,11 +257,20 @@ def get_user_stats(usuario):
     for color in COLORES_BOTELLAS:
         conteo_colores[color.lower()] = len([r for r in registros if r.color == color])
     
+    # Información de lotes
+    lotes = set([r.lote for r in registros if r.lote is not None])
+    lotes_count = len(lotes)
+    min_lote = min(lotes) if lotes else None
+    max_lote = max(lotes) if lotes else None
+    
     return jsonify({
         'usuario': usuario,
         'total': total,
         'duplicados': duplicados,
-        **conteo_colores  # Agrega todos los conteos de colores al JSON
+        'lotes_count': lotes_count,
+        'min_lote': min_lote,
+        'max_lote': max_lote,
+        **conteo_colores
     })
 
 @app.route('/descargar_csv')
@@ -255,7 +279,7 @@ def descargar_csv():
     cw = csv.writer(si)
     
     # Encabezados dinámicos basados en los colores configurados
-    headers = ['Timestamp', 'Usuario', 'NFC ID'] + COLORES_BOTELLAS + ['Estado', 'Origen']
+    headers = ['Timestamp', 'Usuario', 'NFC ID', 'Lote'] + COLORES_BOTELLAS + ['Estado', 'Origen']
     cw.writerow(headers)
     
     # Obtener todos los registros ordenados por fecha
@@ -266,7 +290,8 @@ def descargar_csv():
         row = [
             registro.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             registro.usuario,
-            registro.nfc_id
+            registro.nfc_id,
+            registro.lote if registro.lote is not None else ''  # Incluimos el lote
         ]
         
         # Agregar 1 o 0 para cada color según corresponda
@@ -308,14 +333,28 @@ def get_stats():
     for color in COLORES_BOTELLAS:
         stats_colores[color] = Registro.query.filter_by(color=color).count()
     
+    # Estadísticas de lotes
+    registros_con_lote = Registro.query.filter(Registro.lote.isnot(None)).all()
+    lotes_unicos = set([r.lote for r in registros_con_lote])
+    total_lotes = len(lotes_unicos)
+    min_lote = min(lotes_unicos) if lotes_unicos else None
+    max_lote = max(lotes_unicos) if lotes_unicos else None
+    
     # Si hay usuario en sesión, obtener sus estadísticas
     user_stats = None
     if 'usuario' in session:
         registros_usuario = Registro.query.filter_by(usuario=session['usuario']).all()
+        lotes_usuario = set([r.lote for r in registros_usuario if r.lote is not None])
+        
         user_stats = {
             'total': len(registros_usuario),
             'duplicados': len([r for r in registros_usuario if r.estado == 'nfc_duplicado']),
-            'colores': {}
+            'colores': {},
+            'lotes': {
+                'total': len(lotes_usuario),
+                'min': min(lotes_usuario) if lotes_usuario else None,
+                'max': max(lotes_usuario) if lotes_usuario else None
+            }
         }
         for color in COLORES_BOTELLAS:
             user_stats['colores'][color] = len([r for r in registros_usuario if r.color == color])
@@ -324,6 +363,11 @@ def get_stats():
         'total_registros': total_registros,
         'total_duplicados': total_duplicados,
         'stats_colores': stats_colores,
+        'lotes': {
+            'total': total_lotes,
+            'min': min_lote,
+            'max': max_lote
+        },
         'user_stats': user_stats
     })
     # Total de registros
