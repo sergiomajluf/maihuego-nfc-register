@@ -27,13 +27,11 @@ class Registro(db.Model):
 # Crear tablas
 with app.app_context():
     db.create_all()
-
+sou 
 # Colores disponibles
 COLORES_BOTELLAS = [
-    'Rojo',
-    'Verde',
-    'Azul',
-    'Amarillo'
+    'Blanco',
+    'Negro',
 ]
 
 @app.route('/')
