@@ -4,7 +4,7 @@
 #include <ArduinoJson.h>
 #include <Wire.h>
 #include <Adafruit_PN532.h>
-#include <Preferences.h>   // Biblioteca para almacenamiento persistente
+#include <Preferences.h>  // Biblioteca para almacenamiento persistente
 
 // Incluir archivo de configuración
 #include "config.h"
@@ -31,7 +31,7 @@ void indicarGuardado() {
     digitalWrite(BUZZER_PIN, HIGH);
     delay(100);
     digitalWrite(BUZZER_PIN, LOW);
-    
+
     digitalWrite(LED_VERDE, LOW);
     digitalWrite(LED_ROJO, HIGH);
     delay(100);
@@ -61,7 +61,7 @@ void guardarEstado() {
   preferences.putInt("lote", lote);
   preferences.putInt("succesCount", succesCount);
   preferences.end();  // Cerrar el espacio de nombres
-  
+
   Serial.println("---------------------------------------------");
   Serial.println("ESTADO GUARDADO EN MEMORIA PERSISTENTE");
   Serial.print("Lote: ");
@@ -69,20 +69,20 @@ void guardarEstado() {
   Serial.print("Contador de botellas: ");
   Serial.println(succesCount);
   Serial.println("---------------------------------------------");
-  
+
   indicarGuardado();
 }
 
 // Función para cargar el estado desde la memoria persistente
 void cargarEstado() {
   preferences.begin("nfc-system", false);  // Abrir el espacio de nombres
-  
+
   // Cargar valores con valores predeterminados si no existen
   lote = preferences.getInt("lote", 1);
   succesCount = preferences.getInt("succesCount", 0);
-  
+
   preferences.end();  // Cerrar el espacio de nombres
-  
+
   Serial.println("---------------------------------------------");
   Serial.println("ESTADO CARGADO DESDE MEMORIA PERSISTENTE");
   Serial.print("Lote: ");
@@ -97,17 +97,17 @@ void restablecerValoresFabrica() {
   preferences.begin("nfc-system", false);
   preferences.clear();  // Borrar todos los valores almacenados
   preferences.end();
-  
+
   // Restablecer valores a los predeterminados en config.h
   lote = 1;
   succesCount = 0;
-  
+
   Serial.println("---------------------------------------------");
   Serial.println("VALORES RESTABLECIDOS A CONFIGURACIÓN DE FÁBRICA");
   Serial.println("Lote: 1");
   Serial.println("Contador de botellas: 0");
   Serial.println("---------------------------------------------");
-  
+
   indicarReinicioFabrica();
 }
 
@@ -141,7 +141,7 @@ void indicarEstadoError() {
   if (tiempoRestante > 0) {
     delay(tiempoRestante);
   }
-  
+
   digitalWrite(LED_ROJO, LOW);
 }
 
@@ -155,7 +155,7 @@ void enviarNFCId(String nfcId) {
     ESP.restart();
     return;
   }
-  
+
   if (nfcId.equalsIgnoreCase(MASTER_CARD_RESET)) {
     Serial.println("¡TARJETA MAESTRA DE REINICIO DETECTADA! Restableciendo valores de fábrica...");
     restablecerValoresFabrica();
@@ -169,6 +169,10 @@ void enviarNFCId(String nfcId) {
     HTTPClient http;
     http.begin(serverUrl);
     http.addHeader("Content-Type", "application/json");
+
+    // Configurar tiempos de espera más largos
+    http.setConnectTimeout(10000);  // 10 segundos para conexión (por defecto 5s)
+    http.setTimeout(15000);         // 15 segundos para recibir respuesta (por defecto 5s)
 
     // Crear JSON
     StaticJsonDocument<200> doc;
@@ -214,13 +218,13 @@ void enviarNFCId(String nfcId) {
           Serial.print(succesCount);
           Serial.print("/");
           Serial.println(botellasPorLote);
-          
+
           if (succesCount >= botellasPorLote) {
             lote++;
             succesCount = 0;
             Serial.println("¡LOTE COMPLETADO! Avanzando al siguiente lote.");
           }
-          
+
           indicarEstadoOK();  // Solo LED verde por tiempo base
         } else {
           Serial.println("Respuesta: Registro Duplicado");
@@ -258,7 +262,7 @@ void leerTarjeta() {
   // Espera por tarjetas tipo ISO14443A (Mifare, etc.)
   success = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 100);
 
-  if (success) {    
+  if (success) {
     String result = "";
     for (int szPos = 0; szPos < uidLength; szPos++) {
       if (uid[szPos] <= 0xF) {
@@ -360,7 +364,7 @@ void setup() {
   Serial.print("Botellas por lote: ");
   Serial.println(botellasPorLote);
   Serial.println("---------------------------------------------");
-  
+
   // Información sobre tarjetas maestras
   Serial.println("TARJETAS MAESTRAS CONFIGURADAS:");
   Serial.print("Guardar estado: ");
@@ -411,7 +415,7 @@ void loop() {
     }
 
     digitalWrite(LED_ROJO, LOW);  // Apagar LED después del intento
-    
+
     if (WiFi.status() == WL_CONNECTED) {
       Serial.println("\nWiFi reconectado");
     } else {
