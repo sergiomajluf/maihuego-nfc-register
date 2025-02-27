@@ -9,7 +9,7 @@
                 Total Registros: {{ registros|length }}
             </span>
             <div id="filtroActivo" class="hidden bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded dark:bg-yellow-900 dark:text-yellow-300">
-                Mostrando solo duplicados de: <span id="filtroNfcId"></span>
+                Duplicados de: <span id="filtroNfcId"></span>
                 <button id="limpiarFiltro" class="ml-2 text-xs text-red-600 hover:text-red-800">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
@@ -208,7 +208,7 @@
                             ${data.data.estado}
                         </span>
                         ${isDuplicado ? 
-                          '<span class="ml-2 text-xs text-yellow-600 dark:text-yellow-400 hidden md:inline-block">(Click para filtrar)</span>' : 
+                          '<span class="ml-2 text-xs text-yellow-600 dark:text-yellow-400 hidden md:inline-block"></span>' : 
                           ''}
                     </td>
                     <td class="px-6 py-4">

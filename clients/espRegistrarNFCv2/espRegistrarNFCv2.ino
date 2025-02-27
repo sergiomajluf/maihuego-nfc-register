@@ -17,8 +17,8 @@ const char* serverUrl = "http://192.168.1.95:5000/api/registrar_nfc";
 //const char* serverUrl = "http://10.0.1.127:5000/api/registrar_nfc";
 
 // Configuración del usuario
-const char* USUARIO = "Sergio Majluf";
-const char* COLOR = "Blanco";
+const char* USUARIO = "Felipe Majluf";
+const char* COLOR = "Negro";
 const char* ORIGEN = "esp32";
 
 int lote = 1;

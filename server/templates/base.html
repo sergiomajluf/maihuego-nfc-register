@@ -19,6 +19,12 @@
         <div class="px-3 py-3 lg:px-5 lg:pl-3">
             <div class="flex items-center justify-between">
                 <div class="flex items-center justify-start">
+                    <button id="toggleSidebar" type="button" class="inline-flex items-center p-2 text-sm text-gray-500 rounded-lg sm:hidden hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600">
+                        <span class="sr-only">Abrir menú</span>
+                        <svg class="w-6 h-6" aria-hidden="true" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                            <path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
                     <a href="{{ url_for('index') }}" class="flex ml-2 md:mr-24">
                         <span class="self-center text-xl font-semibold sm:text-2xl whitespace-nowrap dark:text-white">Sistema NFC</span>
                     </a>
@@ -86,6 +92,71 @@
     <div class="p-4 sm:ml-64 pt-20">
         {% block content %}{% endblock %}
     </div>
+
+    <script>
+        // Función para manejar el menú móvil
+        function setupMobileMenu() {
+          // Identificar elementos del DOM
+          const sidebarToggle = document.getElementById('toggleSidebar');
+          const sidebar = document.getElementById('logo-sidebar');
+          
+          // Verificar si existen los elementos
+          if (!sidebarToggle || !sidebar) {
+            console.error('No se encontraron los elementos del menú');
+            return;
+          }
+          
+          // Asegurarse de que el menú comienza cerrado en móvil
+          if (window.innerWidth < 640) {
+            sidebar.classList.add('-translate-x-full');
+          }
+          
+          // Función para abrir/cerrar el menú
+          function toggleMenu() {
+            sidebar.classList.toggle('-translate-x-full');
+            console.log('Toggled menu:', !sidebar.classList.contains('-translate-x-full') ? 'open' : 'closed');
+          }
+          
+          // Agregar evento click al botón
+          sidebarToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleMenu();
+          });
+          
+          // Cerrar al hacer clic en un enlace
+          const links = sidebar.querySelectorAll('a');
+          links.forEach(link => {
+            link.addEventListener('click', function() {
+              if (window.innerWidth < 640) {
+                sidebar.classList.add('-translate-x-full');
+              }
+            });
+          });
+          
+          // Cerrar al hacer clic fuera del menú
+          document.addEventListener('click', function(e) {
+            if (window.innerWidth < 640 && 
+                !sidebar.contains(e.target) && 
+                e.target !== sidebarToggle) {
+              sidebar.classList.add('-translate-x-full');
+            }
+          });
+          
+          // También agregar evento touch para dispositivos táctiles
+          sidebarToggle.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            toggleMenu();
+          });
+        }
+
+        // Ejecutar cuando el DOM esté listo
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', setupMobileMenu);
+        } else {
+          setupMobileMenu();
+        }
+    </script>
 
     {% block scripts %}{% endblock %}
 </body>
