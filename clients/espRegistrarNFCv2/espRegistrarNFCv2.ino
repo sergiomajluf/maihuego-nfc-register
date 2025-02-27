@@ -4,50 +4,112 @@
 #include <ArduinoJson.h>
 #include <Wire.h>
 #include <Adafruit_PN532.h>
+#include <Preferences.h>   // Biblioteca para almacenamiento persistente
 
-// Configuración de WiFi (hardcoded)
-// const char* ssid = "bbrands";
-// const char* password = "maihue2023.";
-const char* ssid = "__";
-const char* password = "majlufgarcia";
+// Incluir archivo de configuración
+#include "config.h"
 
-// Configuración del servidor
-const char* serverUrl = "http://192.168.1.95:5000/api/registrar_nfc";
-//const char* serverUrl = "http://10.0.1.226:5000/api/registrar_nfc";
-//const char* serverUrl = "http://10.0.1.127:5000/api/registrar_nfc";
-
-// Configuración del usuario
-const char* USUARIO = "Felipe Majluf";
-const char* COLOR = "Negro";
-const char* ORIGEN = "esp32";
-
-int lote = 1;
+// Variables globales
 int succesCount = 0;
-int botellasPorLote = 4; //48
-
-// Configuración de pines
-#define LED_VERDE 26   // GPIO para LED verde
-#define LED_ROJO 32    // GPIO para LED rojo
-#define BUZZER_PIN 27  // GPIO para Buzzer activo
-
-// Configuración NFC por I2C
-#define PN532_SDA 21   // Pin SDA para el PN532
-#define PN532_SCL 22   // Pin SCL para el PN532
-#define PN532_IRQ 2    // Pin IRQ para el PN532
-#define PN532_RESET 3  // Pin RESET para el PN532 (No conectado en el Shield NFC)
-
-// Parámetros de tiempo
-#define TIEMPO_BASE_LED 2000    // Tiempo base para LEDs (ms)
-#define TIEMPO_LED_OK TIEMPO_BASE_LED          // Tiempo encendido LED verde (ms)
-#define TIEMPO_LED_ERROR (TIEMPO_BASE_LED*2)   // Tiempo encendido LED rojo (ms), el doble del verde
-#define REPORT_COOLDOWN 1500   // Tiempo mínimo entre lecturas de la misma tarjeta (ms)
 
 // Instancia del PN532
 Adafruit_PN532 nfc(PN532_IRQ, PN532_RESET);
 
+// Instancia de Preferences para almacenamiento persistente
+Preferences preferences;
+
 // Variables para control de NFC
 String lastReportedRfid = "";      // Último ID de RFID reportado
 unsigned long lastReportTime = 0;  // Tiempo de la última lectura
+
+// Secuencia especial para indicar guardado en memoria
+void indicarGuardado() {
+  // Patrón alternante de LEDs verde y rojo con pitidos
+  for (int i = 0; i < 5; i++) {
+    digitalWrite(LED_VERDE, HIGH);
+    digitalWrite(LED_ROJO, LOW);
+    digitalWrite(BUZZER_PIN, HIGH);
+    delay(100);
+    digitalWrite(BUZZER_PIN, LOW);
+    
+    digitalWrite(LED_VERDE, LOW);
+    digitalWrite(LED_ROJO, HIGH);
+    delay(100);
+  }
+  digitalWrite(LED_VERDE, LOW);
+  digitalWrite(LED_ROJO, LOW);
+}
+
+// Secuencia especial para indicar reinicio a valores de fábrica
+void indicarReinicioFabrica() {
+  // Tres secuencias completas de encendido de ambos LEDs
+  for (int i = 0; i < 3; i++) {
+    digitalWrite(LED_VERDE, HIGH);
+    digitalWrite(LED_ROJO, HIGH);
+    digitalWrite(BUZZER_PIN, HIGH);
+    delay(300);
+    digitalWrite(LED_VERDE, LOW);
+    digitalWrite(LED_ROJO, LOW);
+    digitalWrite(BUZZER_PIN, LOW);
+    delay(300);
+  }
+}
+
+// Función para guardar el estado actual en la memoria persistente
+void guardarEstado() {
+  preferences.begin("nfc-system", false);  // Abrir el espacio de nombres
+  preferences.putInt("lote", lote);
+  preferences.putInt("succesCount", succesCount);
+  preferences.end();  // Cerrar el espacio de nombres
+  
+  Serial.println("---------------------------------------------");
+  Serial.println("ESTADO GUARDADO EN MEMORIA PERSISTENTE");
+  Serial.print("Lote: ");
+  Serial.println(lote);
+  Serial.print("Contador de botellas: ");
+  Serial.println(succesCount);
+  Serial.println("---------------------------------------------");
+  
+  indicarGuardado();
+}
+
+// Función para cargar el estado desde la memoria persistente
+void cargarEstado() {
+  preferences.begin("nfc-system", false);  // Abrir el espacio de nombres
+  
+  // Cargar valores con valores predeterminados si no existen
+  lote = preferences.getInt("lote", 1);
+  succesCount = preferences.getInt("succesCount", 0);
+  
+  preferences.end();  // Cerrar el espacio de nombres
+  
+  Serial.println("---------------------------------------------");
+  Serial.println("ESTADO CARGADO DESDE MEMORIA PERSISTENTE");
+  Serial.print("Lote: ");
+  Serial.println(lote);
+  Serial.print("Contador de botellas: ");
+  Serial.println(succesCount);
+  Serial.println("---------------------------------------------");
+}
+
+// Función para restablecer valores de fábrica
+void restablecerValoresFabrica() {
+  preferences.begin("nfc-system", false);
+  preferences.clear();  // Borrar todos los valores almacenados
+  preferences.end();
+  
+  // Restablecer valores a los predeterminados en config.h
+  lote = 1;
+  succesCount = 0;
+  
+  Serial.println("---------------------------------------------");
+  Serial.println("VALORES RESTABLECIDOS A CONFIGURACIÓN DE FÁBRICA");
+  Serial.println("Lote: 1");
+  Serial.println("Contador de botellas: 0");
+  Serial.println("---------------------------------------------");
+  
+  indicarReinicioFabrica();
+}
 
 // Función para mostrar estado OK (solo LED verde)
 void indicarEstadoOK() {
@@ -64,18 +126,18 @@ void indicarEstadoError() {
   for (int j = 0; j < 3; j++) {
     // Pulso largo (grave)
     digitalWrite(BUZZER_PIN, HIGH);
-    delay(200);
+    delay(240);
     digitalWrite(BUZZER_PIN, LOW);
 
     // Pausa entre pulsos
     if (j < 2) {
-      delay(100);
+      delay(120);
     }
   }
 
   // Mantener el LED rojo encendido durante TIEMPO_LED_ERROR (que es 2x el tiempo de LED verde)
   // Restamos el tiempo ya transcurrido en la generación del sonido
-  int tiempoRestante = TIEMPO_LED_ERROR - (3 * 360 + 2 * 180);
+  int tiempoRestante = TIEMPO_LED_ERROR - (3 * 240 + 2 * 120);
   if (tiempoRestante > 0) {
     delay(tiempoRestante);
   }
@@ -85,6 +147,24 @@ void indicarEstadoError() {
 
 // Función para enviar ID de NFC al servidor
 void enviarNFCId(String nfcId) {
+  // Verificar si es una tarjeta maestra
+  if (nfcId.equalsIgnoreCase(MASTER_CARD_SAVE)) {
+    Serial.println("¡TARJETA MAESTRA DETECTADA! Guardando estado y reiniciando...");
+    guardarEstado();
+    delay(1000);  // Esperar un segundo antes de reiniciar
+    ESP.restart();
+    return;
+  }
+  
+  if (nfcId.equalsIgnoreCase(MASTER_CARD_RESET)) {
+    Serial.println("¡TARJETA MAESTRA DE REINICIO DETECTADA! Restableciendo valores de fábrica...");
+    restablecerValoresFabrica();
+    delay(1000);  // Esperar un segundo antes de reiniciar
+    ESP.restart();
+    return;
+  }
+
+  // Si no es una tarjeta maestra, continuar con el proceso normal
   if (WiFi.status() == WL_CONNECTED) {
     HTTPClient http;
     http.begin(serverUrl);
@@ -201,6 +281,10 @@ void leerTarjeta() {
       lastReportedRfid = result;
       lastReportTime = currentTime;
 
+      // Imprimir el ID de la tarjeta escaneada
+      Serial.print("Tarjeta escaneada - ID: ");
+      Serial.println(result);
+
       // Enviar al servidor
       enviarNFCId(result);
     }
@@ -209,6 +293,9 @@ void leerTarjeta() {
 
 void setup() {
   Serial.begin(115200);
+  Serial.println("\n---------------------------------------------");
+  Serial.println("Iniciando sistema NFC para etiquetado de botellas");
+  Serial.println("---------------------------------------------");
 
   // Configurar pines
   pinMode(LED_VERDE, OUTPUT);
@@ -232,6 +319,9 @@ void setup() {
   delay(50);
   digitalWrite(BUZZER_PIN, LOW);
 
+  // Cargar el estado guardado desde la memoria persistente
+  cargarEstado();
+
   // Iniciar comunicación I2C
   Wire.begin(PN532_SDA, PN532_SCL);
 
@@ -249,44 +339,84 @@ void setup() {
 
   // Configurar el PN532 para leer tarjetas RFID
   nfc.SAMConfig();
+  Serial.println("Lector NFC inicializado correctamente");
+
+  // Mostrar parámetros de configuración
+  Serial.println("\nConfiguración cargada:");
+  Serial.print("WiFi SSID: ");
+  Serial.println(ssid);
+  Serial.print("Servidor: ");
+  Serial.println(serverUrl);
+  Serial.print("Usuario: ");
+  Serial.println(USUARIO);
+  Serial.print("Color: ");
+  Serial.println(COLOR);
+  Serial.print("Origen: ");
+  Serial.println(ORIGEN);
+  Serial.print("Lote actual: ");
+  Serial.println(lote);
+  Serial.print("Contador de botellas: ");
+  Serial.println(succesCount);
+  Serial.print("Botellas por lote: ");
+  Serial.println(botellasPorLote);
+  Serial.println("---------------------------------------------");
+  
+  // Información sobre tarjetas maestras
+  Serial.println("TARJETAS MAESTRAS CONFIGURADAS:");
+  Serial.print("Guardar estado: ");
+  Serial.println(MASTER_CARD_SAVE);
+  Serial.print("Reiniciar a valores de fábrica: ");
+  Serial.println(MASTER_CARD_RESET);
+  Serial.println("---------------------------------------------");
 
   // Conectar a WiFi
+  Serial.print("Conectando a WiFi...");
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
-    delay(250);
+    delay(500);
+    Serial.print(".");
     // Parpadeo de LED para indicar intento de conexión
     digitalWrite(LED_ROJO, !digitalRead(LED_ROJO));
   }
 
   digitalWrite(LED_ROJO, LOW);  // Apagar LED después de conectar
 
+  Serial.println("\nConectado a WiFi");
+  Serial.print("Dirección IP: ");
+  Serial.println(WiFi.localIP());
+
   // Indicar conexión exitosa
   digitalWrite(LED_VERDE, HIGH);
   delay(500);
   digitalWrite(LED_VERDE, LOW);
 
-  Serial.println("Iniciándose, hardware OK");
-  Serial.print("Lote actual: ");
-  Serial.println(lote);
-  Serial.print("Botellas por lote: ");
-  Serial.println(botellasPorLote);
+  Serial.println("\nSistema listo para escanear tags NFC");
+  Serial.println("---------------------------------------------");
 }
 
 void loop() {
   // Verificar conexión WiFi y reconectar si es necesario
   if (WiFi.status() != WL_CONNECTED) {
+    Serial.print("WiFi desconectado. Reconectando...");
     WiFi.begin(ssid, password);
 
     // Esperar a la reconexión con timeout
     int timeout = 0;
     while (WiFi.status() != WL_CONNECTED && timeout < 20) {
       delay(500);
+      Serial.print(".");
       digitalWrite(LED_ROJO, !digitalRead(LED_ROJO));  // Parpadear LED durante la reconexión
       timeout++;
     }
 
     digitalWrite(LED_ROJO, LOW);  // Apagar LED después del intento
+    
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("\nWiFi reconectado");
+    } else {
+      Serial.println("\nFallo en la reconexión WiFi");
+    }
   }
 
   // Leer tarjeta NFC

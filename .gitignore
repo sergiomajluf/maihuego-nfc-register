@@ -1,3 +1,6 @@
+# Archivo de configuración con datos sensibles
+config.h
+
 # Python
 __pycache__/
 *.py[cod]

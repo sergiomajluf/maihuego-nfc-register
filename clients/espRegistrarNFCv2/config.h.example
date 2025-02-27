@@ -1,0 +1,41 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+// Configuración de WiFi (REEMPLAZAR CON TUS CREDENCIALES)
+const char* ssid = "nombre_de_red";          // Sustituir por tu SSID
+const char* password = "contraseña_wifi";    // Sustituir por tu contraseña
+
+// Configuración del servidor
+const char* serverUrl = "http://x.x.x.x:5000/api/registrar_nfc";  // Sustituir por la IP de tu servidor
+
+// Configuración del usuario
+const char* USUARIO = "Nombre Usuario";       // Sustituir por el nombre del usuario
+const char* COLOR = "Color";                  // Sustituir por el color
+const char* ORIGEN = "esp32";
+
+// Configuración de lotes
+int lote = 1;                // Lote inicial
+int botellasPorLote = 48;    // Número de botellas por lote
+
+// Tarjetas maestras (REEMPLAZAR CON TUS IDs)
+const char* MASTER_CARD_SAVE = "xxxxxxxx";    // ID de tarjeta para guardar estado
+const char* MASTER_CARD_RESET = "xxxxxxxx";   // ID de tarjeta para restablecer valores
+
+// Configuración de pines
+#define LED_VERDE 25   // GPIO para LED verde
+#define LED_ROJO 19    // GPIO para LED rojo
+#define BUZZER_PIN 27  // GPIO para Buzzer activo
+
+// Configuración NFC por I2C
+#define PN532_SDA 21   // Pin SDA para el PN532
+#define PN532_SCL 22   // Pin SCL para el PN532
+#define PN532_IRQ 2    // Pin IRQ para el PN532
+#define PN532_RESET 3  // Pin RESET para el PN532
+
+// Parámetros de tiempo
+#define TIEMPO_BASE_LED 1500    // Tiempo base para LEDs (ms)
+#define TIEMPO_LED_OK TIEMPO_BASE_LED          // Tiempo encendido LED verde (ms)
+#define TIEMPO_LED_ERROR (TIEMPO_BASE_LED*2)   // Tiempo encendido LED rojo (ms)
+#define REPORT_COOLDOWN 1500   // Tiempo mínimo entre lecturas de la misma tarjeta (ms)
+
+#endif // CONFIG_H
