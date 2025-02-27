@@ -6,12 +6,15 @@
 #include <Adafruit_PN532.h>
 
 // Configuración de WiFi (hardcoded)
-const char* ssid = "bbrands";
-const char* password = "maihue2023.";
+// const char* ssid = "bbrands";
+// const char* password = "maihue2023.";
+const char* ssid = "__";
+const char* password = "majlufgarcia";
 
 // Configuración del servidor
+const char* serverUrl = "http://192.168.1.95:5000/api/registrar_nfc";
 //const char* serverUrl = "http://10.0.1.226:5000/api/registrar_nfc";
-const char* serverUrl = "http://10.0.1.127:5000/api/registrar_nfc";
+//const char* serverUrl = "http://10.0.1.127:5000/api/registrar_nfc";
 
 // Configuración del usuario
 const char* USUARIO = "Sergio Majluf";
@@ -23,8 +26,8 @@ int succesCount = 0;
 int botellasPorLote = 4; //48
 
 // Configuración de pines
-#define LED_VERDE 25   // GPIO para LED verde
-#define LED_ROJO 19    // GPIO para LED rojo
+#define LED_VERDE 26   // GPIO para LED verde
+#define LED_ROJO 32    // GPIO para LED rojo
 #define BUZZER_PIN 27  // GPIO para Buzzer activo
 
 // Configuración NFC por I2C
@@ -34,7 +37,7 @@ int botellasPorLote = 4; //48
 #define PN532_RESET 3  // Pin RESET para el PN532 (No conectado en el Shield NFC)
 
 // Parámetros de tiempo
-#define TIEMPO_BASE_LED 1500    // Tiempo base para LEDs (ms)
+#define TIEMPO_BASE_LED 2000    // Tiempo base para LEDs (ms)
 #define TIEMPO_LED_OK TIEMPO_BASE_LED          // Tiempo encendido LED verde (ms)
 #define TIEMPO_LED_ERROR (TIEMPO_BASE_LED*2)   // Tiempo encendido LED rojo (ms), el doble del verde
 #define REPORT_COOLDOWN 1500   // Tiempo mínimo entre lecturas de la misma tarjeta (ms)
@@ -61,12 +64,12 @@ void indicarEstadoError() {
   for (int j = 0; j < 3; j++) {
     // Pulso largo (grave)
     digitalWrite(BUZZER_PIN, HIGH);
-    delay(240);
+    delay(200);
     digitalWrite(BUZZER_PIN, LOW);
 
     // Pausa entre pulsos
     if (j < 2) {
-      delay(120);
+      delay(100);
     }
   }
 
@@ -251,7 +254,7 @@ void setup() {
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
+    delay(250);
     // Parpadeo de LED para indicar intento de conexión
     digitalWrite(LED_ROJO, !digitalRead(LED_ROJO));
   }

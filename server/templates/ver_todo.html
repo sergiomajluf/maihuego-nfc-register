@@ -8,6 +8,15 @@
             <span id="totalRegistros" class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
                 Total Registros: {{ registros|length }}
             </span>
+            <div id="filtroActivo" class="hidden bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded dark:bg-yellow-900 dark:text-yellow-300">
+                Mostrando solo duplicados de: <span id="filtroNfcId"></span>
+                <button id="limpiarFiltro" class="ml-2 text-xs text-red-600 hover:text-red-800">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                    Limpiar
+                </button>
+            </div>
         </div>
         <a href="{{ url_for('descargar_csv') }}" 
            class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 focus:ring-4 focus:ring-green-300 dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800">
@@ -33,7 +42,9 @@
             </thead>
             <tbody>
                 {% for registro in registros %}
-                <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                <tr class="{% if registro.estado == 'nfc_duplicado' %}cursor-pointer bg-white hover:bg-yellow-50 dark:hover:bg-yellow-900{% else %}bg-white hover:bg-gray-50 dark:hover:bg-gray-600{% endif %} border-b dark:bg-gray-800 dark:border-gray-700" 
+                    data-nfc-id="{{ registro.nfc_id }}" 
+                    data-estado="{{ registro.estado }}">
                     <td class="px-6 py-4 font-medium">
                         {{ registro.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}
                     </td>
@@ -50,6 +61,10 @@
                         <span class="px-2 py-1 text-xs font-medium rounded-full {% if registro.estado == 'nfc_OK' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300{% else %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300{% endif %}">
                             {{ registro.estado }}
                         </span>
+                        {% if registro.estado == 'nfc_duplicado' %}
+                        <span class="ml-2 text-xs text-yellow-600 dark:text-yellow-400 hidden md:inline-block">
+                        </span>
+                        {% endif %}
                     </td>
                     <td class="px-6 py-4">
                         <span class="px-2 py-1 text-xs font-medium rounded-full {% if registro.origen == 'web' %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300{% elif registro.origen == '--' %}bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300{% else %}bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300{% endif %}">
@@ -70,6 +85,11 @@
         const socket = io();
         const tbody = document.querySelector('tbody');
         const totalRegistros = document.getElementById('totalRegistros');
+        const filtroActivo = document.getElementById('filtroActivo');
+        const filtroNfcId = document.getElementById('filtroNfcId');
+        const limpiarFiltro = document.getElementById('limpiarFiltro');
+        let registrosFiltrados = false;
+        let nfcIdActual = null;
 
         console.log('Socket inicializado en verTodo');
         
@@ -81,13 +101,92 @@
             console.log('Desconectado del servidor WebSocket');
         });
         
+        // Función para filtrar la tabla por NFC ID
+        function filtrarPorNfcId(nfcId) {
+            nfcIdActual = nfcId;
+            registrosFiltrados = true;
+            
+            // Mostrar indicador de filtro activo
+            filtroNfcId.textContent = nfcId;
+            filtroActivo.classList.remove('hidden');
+            
+            // Recorrer todas las filas y ocultar las que no coinciden
+            const filas = tbody.querySelectorAll('tr');
+            let contadorMostrados = 0;
+            
+            filas.forEach(fila => {
+                const nfcIdFila = fila.querySelector('td:nth-child(3)').textContent.trim();
+                if (nfcIdFila === nfcId) {
+                    fila.classList.remove('hidden');
+                    fila.classList.add('bg-yellow-50', 'dark:bg-yellow-900');
+                    contadorMostrados++;
+                } else {
+                    fila.classList.add('hidden');
+                }
+            });
+            
+            // Actualizar contador
+            totalRegistros.textContent = `Mostrando: ${contadorMostrados} de ${filas.length}`;
+        }
+        
+        // Función para limpiar filtro
+        function limpiarFiltrado() {
+            registrosFiltrados = false;
+            nfcIdActual = null;
+            
+            // Ocultar indicador de filtro
+            filtroActivo.classList.add('hidden');
+            
+            // Mostrar todas las filas
+            const filas = tbody.querySelectorAll('tr');
+            filas.forEach(fila => {
+                fila.classList.remove('hidden');
+                fila.classList.remove('bg-yellow-50', 'dark:bg-yellow-900');
+            });
+            
+            // Restaurar contador
+            totalRegistros.textContent = `Total Registros: ${filas.length}`;
+        }
+        
+        // Asignar evento a botón de limpiar
+        limpiarFiltro.addEventListener('click', limpiarFiltrado);
+        
+        // Asignar evento a filas de la tabla
+        tbody.addEventListener('click', function(e) {
+            // Encontrar la fila más cercana al elemento clickeado
+            const fila = e.target.closest('tr');
+            if (!fila) return;
+            
+            // Verificar si es un registro duplicado
+            const estado = fila.getAttribute('data-estado');
+            if (estado === 'nfc_duplicado') {
+                const nfcId = fila.getAttribute('data-nfc-id');
+                
+                if (registrosFiltrados && nfcId === nfcIdActual) {
+                    // Si ya estamos filtrando por este NFC ID, limpiar filtro
+                    limpiarFiltrado();
+                } else {
+                    // Filtrar por este NFC ID
+                    filtrarPorNfcId(nfcId);
+                }
+            }
+        });
+        
         socket.on('database_updated', function(data) {
             console.log('Recibido evento database_updated:', data);
             
             if (data.type === 'new_registro') {
                 // Crear nueva fila
                 const newRow = document.createElement('tr');
-                newRow.className = 'bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600';
+                const isDuplicado = data.data.estado === 'nfc_duplicado';
+                
+                // Establecer clases y atributos data
+                newRow.className = isDuplicado ? 
+                    'cursor-pointer bg-white hover:bg-yellow-50 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-yellow-900 border-b' : 
+                    'bg-white hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-600 border-b';
+                
+                newRow.setAttribute('data-nfc-id', data.data.nfc_id);
+                newRow.setAttribute('data-estado', data.data.estado);
                 
                 newRow.innerHTML = `
                     <td class="px-6 py-4 font-medium">${data.data.timestamp}</td>
@@ -108,6 +207,9 @@
                         }">
                             ${data.data.estado}
                         </span>
+                        ${isDuplicado ? 
+                          '<span class="ml-2 text-xs text-yellow-600 dark:text-yellow-400 hidden md:inline-block">(Click para filtrar)</span>' : 
+                          ''}
                     </td>
                     <td class="px-6 py-4">
                         <span class="px-2 py-1 text-xs font-medium rounded-full ${
@@ -125,10 +227,25 @@
                 // Insertar al inicio de la tabla
                 tbody.insertBefore(newRow, tbody.firstChild);
                 
+                // Si hay filtro activo, aplicarlo a la nueva fila
+                if (registrosFiltrados) {
+                    if (data.data.nfc_id === nfcIdActual) {
+                        newRow.classList.add('bg-yellow-50', 'dark:bg-yellow-900');
+                    } else {
+                        newRow.classList.add('hidden');
+                    }
+                }
+                
                 // Actualizar contador
-                const currentTotal = parseInt(totalRegistros.textContent.split(': ')[1]);
-                totalRegistros.textContent = `Total Registros: ${currentTotal + 1}`;
-
+                const currentCount = parseInt(totalRegistros.textContent.split(':')[1].trim().split(' ')[0]);
+                if (registrosFiltrados) {
+                    const totalCount = tbody.querySelectorAll('tr').length;
+                    const visibleCount = data.data.nfc_id === nfcIdActual ? currentCount + 1 : currentCount;
+                    totalRegistros.textContent = `Mostrando: ${visibleCount} de ${totalCount}`;
+                } else {
+                    totalRegistros.textContent = `Total Registros: ${currentCount + 1}`;
+                }
+                
                 // Efecto visual para la nueva fila
                 newRow.style.backgroundColor = '#f0f9ff';
                 setTimeout(() => {
