@@ -1,5 +1,6 @@
 # Archivo de configuración con datos sensibles
 config.h
+dbBackups/
 
 # Python
 __pycache__/
