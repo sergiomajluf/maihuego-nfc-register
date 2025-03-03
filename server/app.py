@@ -1,5 +1,5 @@
 # app.py
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, Response
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, Response, flash
 from flask_socketio import SocketIO, emit
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
@@ -64,6 +64,79 @@ def login():
         session['color'] = color
         return redirect(url_for('registrar_nfc'))
 
+@app.route('/registro/<int:registro_id>', methods=['GET', 'POST', 'DELETE'])
+def editar_registro(registro_id):
+    # Buscar el registro por ID de la base de datos (clave primaria)
+    registro = Registro.query.get_or_404(registro_id)
+    
+    # Si la solicitud es para eliminar el registro
+    if request.method == 'POST' and request.form.get('_method') == 'DELETE':
+        try:
+            # Guardar datos para notificar
+            registro_data = {
+                'id': registro.id,
+                'nfc_id': registro.nfc_id,
+                'usuario': registro.usuario,
+                'color': registro.color,
+                'estado': registro.estado,
+                'origen': registro.origen,
+                'lote': registro.lote,
+                'timestamp': registro.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+            }
+            
+            # Eliminar el registro
+            db.session.delete(registro)
+            db.session.commit()
+            
+            # Emitir evento de eliminación
+            socketio.emit('database_updated', {
+                'type': 'delete_registro',
+                'data': registro_data
+            })
+            
+            flash(f'Registro #{registro_id} eliminado con éxito', 'success')
+            return redirect(url_for('ver_todo'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al eliminar: {str(e)}', 'error')
+    
+    # Si la solicitud es para actualizar el registro
+    elif request.method == 'POST':
+        try:
+            # Actualizar los campos del registro
+            registro.usuario = request.form['usuario']
+            registro.color = request.form['color']
+            registro.lote = request.form['lote'] if request.form['lote'] else None
+            registro.estado = request.form['estado']
+            registro.origen = request.form['origen']
+            
+            # Hacer commit directamente
+            db.session.commit()
+            
+            # Emitir evento de actualización
+            socketio.emit('database_updated', {
+                'type': 'update_registro',
+                'data': {
+                    'id': registro.id,
+                    'nfc_id': registro.nfc_id,
+                    'usuario': registro.usuario,
+                    'color': registro.color,
+                    'estado': registro.estado,
+                    'origen': registro.origen,
+                    'lote': registro.lote,
+                    'timestamp': registro.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                }
+            })
+            
+            flash('Registro actualizado con éxito', 'success')
+            return redirect(url_for('ver_todo'))
+        except Exception as e:
+            # En caso de error, hacer rollback para deshacer cambios parciales
+            db.session.rollback()
+            flash(f'Error al actualizar: {str(e)}', 'error')
+    
+    return render_template('editar_registro.html', registro=registro, colores=COLORES_BOTELLAS)
+
 @app.route('/registrarNFC')
 def registrar_nfc():
     if 'usuario' not in session:
@@ -122,6 +195,7 @@ def handle_nfc_registro(data):
         
         # Preparar datos para enviar
         registros_data = [{
+            'id': r.id,  # Añadimos el ID de la base de datos
             'nfc_id': r.nfc_id,
             'estado': r.estado,
             'color': r.color,
@@ -142,12 +216,13 @@ def handle_nfc_registro(data):
         socketio.emit('database_updated', {
             'type': 'new_registro',
             'data': {
+                'id': nuevo_registro.id,  # Incluir el ID de la base de datos
                 'nfc_id': nuevo_registro.nfc_id,
                 'usuario': nuevo_registro.usuario,
                 'color': nuevo_registro.color,
                 'estado': nuevo_registro.estado,
                 'origen': nuevo_registro.origen,
-                'lote': nuevo_registro.lote,  # Incluimos el lote
+                'lote': nuevo_registro.lote,
                 'timestamp': nuevo_registro.timestamp.strftime('%Y-%m-%d %H:%M:%S')
             }
         })  # True para broadcast
@@ -200,19 +275,21 @@ def api_registrar_nfc():
         socketio.emit('database_updated', {
             'type': 'new_registro',
             'data': {
+                'id': nuevo_registro.id,  # Incluir el ID de la base de datos
                 'nfc_id': nuevo_registro.nfc_id,
                 'usuario': nuevo_registro.usuario,
                 'color': nuevo_registro.color,
                 'estado': nuevo_registro.estado,
                 'origen': nuevo_registro.origen,
-                'lote': nuevo_registro.lote,  # Incluimos el lote
+                'lote': nuevo_registro.lote,
                 'timestamp': nuevo_registro.timestamp.strftime('%Y-%m-%d %H:%M:%S')
             }
         })
 
         return jsonify({
             'estado': nuevo_registro.estado,
-            'mensaje': 'NFC duplicado' if existe else 'Registro exitoso'
+            'mensaje': 'NFC duplicado' if existe else 'Registro exitoso',
+            'id': nuevo_registro.id  # Devolver también el ID generado
         })
 
     except Exception as e:
@@ -220,7 +297,7 @@ def api_registrar_nfc():
             'estado': 'error',
             'mensaje': str(e)
         }), 500
-
+    
 @app.route('/verListadoUsuario')
 def ver_listado():
     usuarios = db.session.query(Registro.usuario).distinct().all()
@@ -254,6 +331,76 @@ def ver_listado():
     
     return render_template('listado.html', resumen=resumen, colores=COLORES_BOTELLAS)
 
+@app.route('/nfc/<nfc_id>', methods=['GET', 'POST', 'DELETE'])
+def editar_nfc(nfc_id):
+    # Buscar el registro por nfc_id
+    registro = Registro.query.filter_by(nfc_id=nfc_id).first_or_404()
+    
+    # Si la solicitud es para eliminar el registro
+    if request.method == 'POST' and request.form.get('_method') == 'DELETE':
+        try:
+            # Guardar datos para notificar
+            registro_data = {
+                'nfc_id': registro.nfc_id,
+                'usuario': registro.usuario,
+                'color': registro.color,
+                'estado': registro.estado,
+                'origen': registro.origen,
+                'lote': registro.lote,
+                'timestamp': registro.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+            }
+            
+            # Eliminar el registro
+            db.session.delete(registro)
+            db.session.commit()
+            
+            # Emitir evento de eliminación
+            socketio.emit('database_updated', {
+                'type': 'delete_registro',
+                'data': registro_data
+            })
+            
+            flash(f'Registro NFC {nfc_id} eliminado con éxito', 'success')
+            return redirect(url_for('ver_todo'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al eliminar: {str(e)}', 'error')
+    
+    # Si la solicitud es para actualizar el registro
+    elif request.method == 'POST':
+        try:
+            # Actualizar los campos del registro
+            registro.usuario = request.form['usuario']
+            registro.color = request.form['color']
+            registro.lote = request.form['lote'] if request.form['lote'] else None
+            registro.estado = request.form['estado']
+            registro.origen = request.form['origen']
+            
+            # Hacer commit directamente
+            db.session.commit()
+            
+            # Emitir evento de actualización
+            socketio.emit('database_updated', {
+                'type': 'update_registro',
+                'data': {
+                    'nfc_id': registro.nfc_id,
+                    'usuario': registro.usuario,
+                    'color': registro.color,
+                    'estado': registro.estado,
+                    'origen': registro.origen,
+                    'lote': registro.lote,
+                    'timestamp': registro.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                }
+            })
+            
+            flash('Registro actualizado con éxito', 'success')
+            return redirect(url_for('ver_todo'))
+        except Exception as e:
+            # En caso de error, hacer rollback para deshacer cambios parciales
+            db.session.rollback()
+            flash(f'Error al actualizar: {str(e)}', 'error')
+    
+    return render_template('editar_nfc.html', registro=registro, colores=COLORES_BOTELLAS)
 @app.route('/verTodo')
 def ver_todo():
     registros = Registro.query.order_by(Registro.timestamp.desc()).all()
@@ -416,6 +563,7 @@ def get_stats():
         'registros_hoy': registros_hoy,
         'usuarios_activos': usuarios_activos
     })
+
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True)

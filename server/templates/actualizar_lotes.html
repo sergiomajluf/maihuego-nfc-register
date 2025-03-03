@@ -1,0 +1,114 @@
+<!-- templates/actualizar_lotes.html -->
+{% extends "base.html" %}
+{% block content %}
+<div class="bg-white rounded-lg shadow dark:bg-gray-800 p-6">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-xl font-bold text-gray-900 dark:text-white">Actualización Masiva de Lotes</h2>
+        <a href="{{ url_for('ver_todo') }}" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Volver a listado
+        </a>
+    </div>
+
+    <!-- Mensajes de alerta -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="p-4 mb-4 text-sm rounded-lg {% if category == 'success' %}bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-300{% else %}bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-300{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% if error %}
+    <div class="p-4 mb-4 text-sm rounded-lg bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-300">
+        Error: {{ error }}
+    </div>
+    {% endif %}
+
+    {% if resultado %}
+        <div class="p-4 mb-6 rounded-lg bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-300">
+            <h3 class="text-lg font-medium mb-2">Actualización Completada</h3>
+            <p>{{ mensaje }}</p>
+        </div>
+
+        {% if total_actualizados > 0 %}
+            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-6">
+                <h4 class="text-md font-medium text-gray-900 dark:text-white mb-2">IDs de registros actualizados:</h4>
+                <div class="max-h-60 overflow-y-auto">
+                    <ul class="list-disc list-inside space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                        {% for nfc_id in registros_ids %}
+                            <li>
+                                <a href="{{ url_for('editar_nfc', nfc_id=nfc_id) }}" class="text-blue-600 hover:underline dark:text-blue-400">
+                                    {{ nfc_id }}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        {% endif %}
+        
+        <div class="flex mt-4">
+            <a href="{{ url_for('ver_todo') }}" 
+               class="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center mr-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
+                Ver todos los registros
+            </a>
+        </div>
+    {% else %}
+        <div class="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-lg mb-6">
+            <div class="flex items-center mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-600 dark:text-yellow-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <h3 class="text-lg font-medium text-yellow-800 dark:text-yellow-300">Atención</h3>
+            </div>
+            <p class="text-yellow-700 dark:text-yellow-400 mb-4">
+                Esta acción actualizará todos los registros de color <span class="font-bold">Negro</span> con <span class="font-bold">Lote 1</span> a <span class="font-bold">Lote 2</span>.
+                Esta operación no se puede deshacer.
+            </p>
+        </div>
+
+        <form method="POST" id="actualizarLotesForm">
+            <button type="submit"
+                   class="text-white bg-yellow-600 hover:bg-yellow-700 focus:ring-4 focus:ring-yellow-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-yellow-600 dark:hover:bg-yellow-700 dark:focus:ring-yellow-800">
+                Proceder con la actualización
+            </button>
+            <a href="{{ url_for('ver_todo') }}" 
+               class="ml-2 text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:ring-gray-300 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600">
+                Cancelar
+            </a>
+        </form>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const socket = io();
+        const formulario = document.getElementById('actualizarLotesForm');
+        
+        // Si existe el formulario, agregar confirmación
+        if (formulario) {
+            formulario.addEventListener('submit', function(e) {
+                if (!confirm('¿Estás seguro de que deseas cambiar todos los registros de color Negro con Lote 1 a Lote 2?')) {
+                    e.preventDefault();
+                }
+            });
+        }
+        
+        // Conectar al websocket
+        socket.on('connect', () => {
+            console.log('Conectado al servidor WebSocket');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Desconectado del servidor WebSocket');
+        });
+    });
+</script>
+{% endblock %}

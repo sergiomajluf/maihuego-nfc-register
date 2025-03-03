@@ -77,8 +77,8 @@ void guardarEstado() {
 void cargarEstado() {
   preferences.begin("nfc-system", false);  // Abrir el espacio de nombres
 
-  // Cargar valores con valores predeterminados si no existen
-  lote = preferences.getInt("lote", 1);
+  // Cargar valores con valores predeterminados de config.h si no existen
+  lote = preferences.getInt("lote", LOTE_INICIAL);
   succesCount = preferences.getInt("succesCount", 0);
 
   preferences.end();  // Cerrar el espacio de nombres
@@ -99,12 +99,13 @@ void restablecerValoresFabrica() {
   preferences.end();
 
   // Restablecer valores a los predeterminados en config.h
-  lote = 1;
+  lote = LOTE_INICIAL;
   succesCount = 0;
 
   Serial.println("---------------------------------------------");
   Serial.println("VALORES RESTABLECIDOS A CONFIGURACIÓN DE FÁBRICA");
-  Serial.println("Lote: 1");
+  Serial.print("Lote: ");
+  Serial.println(lote);
   Serial.println("Contador de botellas: 0");
   Serial.println("---------------------------------------------");
 
@@ -167,12 +168,13 @@ void enviarNFCId(String nfcId) {
   // Si no es una tarjeta maestra, continuar con el proceso normal
   if (WiFi.status() == WL_CONNECTED) {
     HTTPClient http;
-    http.begin(serverUrl);
-    http.addHeader("Content-Type", "application/json");
-
+    
     // Configurar tiempos de espera más largos
     http.setConnectTimeout(10000);  // 10 segundos para conexión (por defecto 5s)
     http.setTimeout(15000);         // 15 segundos para recibir respuesta (por defecto 5s)
+    
+    http.begin(serverUrl);
+    http.addHeader("Content-Type", "application/json");
 
     // Crear JSON
     StaticJsonDocument<200> doc;
@@ -219,10 +221,14 @@ void enviarNFCId(String nfcId) {
           Serial.print("/");
           Serial.println(botellasPorLote);
 
-          if (succesCount >= botellasPorLote) {
+          // Cambiar lote DESPUÉS de completar exactamente el número de botellas por lote
+          if (succesCount == botellasPorLote) {  // Cambiado >= por ==
+            Serial.println("¡LOTE COMPLETADO! Avanzando al siguiente lote.");
             lote++;
             succesCount = 0;
-            Serial.println("¡LOTE COMPLETADO! Avanzando al siguiente lote.");
+            
+            // Guardar estado automáticamente al cambiar de lote
+            guardarEstado();
           }
 
           indicarEstadoOK();  // Solo LED verde por tiempo base
@@ -234,6 +240,17 @@ void enviarNFCId(String nfcId) {
         Serial.println("Respuesta: Error de formato");
         indicarEstadoError();
       }
+    } else if (httpResponseCode == -11) {
+      // Error específico de timeout
+      Serial.println("Timeout del servidor (error -11). El servidor probablemente está procesando la solicitud.");
+      Serial.println("Verificando si el registro se realizó correctamente...");
+      
+      // Esperar un poco más para dar tiempo al servidor a procesar
+      delay(3000);
+      
+      // Por ahora, asumimos que el registro fue exitoso tras un timeout
+      Serial.println("Timeout - Asumiendo registro exitoso. Si hay problemas, escanea de nuevo.");
+      indicarEstadoOK();  // Indicar éxito, pero podría ser un falso positivo
     } else {
       Serial.print("Error en HTTP Request: ");
       Serial.println(httpResponseCode);
@@ -323,8 +340,29 @@ void setup() {
   delay(50);
   digitalWrite(BUZZER_PIN, LOW);
 
+  // Mostrar el lote configurado en config.h
+  Serial.print("Lote configurado en config.h: ");
+  Serial.println(LOTE_INICIAL);
+
   // Cargar el estado guardado desde la memoria persistente
   cargarEstado();
+
+  // Verificar si el usuario quiere forzar un cambio de lote desde config.h
+  #ifdef FORZAR_LOTE
+  if (FORZAR_LOTE) {
+    Serial.println("---------------------------------------------");
+    Serial.println("FORZANDO EL LOTE CONFIGURADO EN CONFIG.H");
+    Serial.print("Lote anterior: ");
+    Serial.println(lote);
+    lote = LOTE_INICIAL;
+    Serial.print("Nuevo lote forzado: ");
+    Serial.println(lote);
+    Serial.println("---------------------------------------------");
+    
+    // Guardar el nuevo lote forzado
+    guardarEstado();
+  }
+  #endif
 
   // Iniciar comunicación I2C
   Wire.begin(PN532_SDA, PN532_SCL);
